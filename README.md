@@ -18,23 +18,23 @@ change is recorded in a permanent activity log.
 **Part 1 · Setup**
 
 1. [Quick start](#quick-start) — copy, paste, running in ~5 minutes
-2. [Requirements](#requirements) — what you need installed
-3. [Installation](#installation) — the same thing, explained step by step
+2. [Testing](#testing) — run the suites; the backend needs no database
+3. [Requirements](#requirements) — what you need installed
+4. [Installation](#installation) — the same thing, explained step by step
 
 **Part 2 · Using the app**
 
-4. [Core concepts](#core-concepts) — workspace, project, task, role, activity
-5. [Signing in](#signing-in) — three ways in, plus the demo accounts
-6. [Roles and permissions](#roles-and-permissions) — who can do what
-7. [Walkthrough for admins](#walkthrough-for-admins)
-8. [Walkthrough for members](#walkthrough-for-members)
-9. [Walkthrough for invitees](#walkthrough-for-invitees)
-10. [Switching workspaces](#switching-workspaces)
+5. [Core concepts](#core-concepts) — workspace, project, task, role, activity
+6. [Signing in](#signing-in) — three ways in, plus the demo accounts
+7. [Roles and permissions](#roles-and-permissions) — who can do what
+8. [Walkthrough for admins](#walkthrough-for-admins)
+9. [Walkthrough for members](#walkthrough-for-members)
+10. [Walkthrough for invitees](#walkthrough-for-invitees)
+11. [Switching workspaces](#switching-workspaces)
 
 **Part 3 · Reference**
 
-11. [Command reference](#command-reference)
-12. [Testing](#testing)
+12. [Command reference](#command-reference)
 13. [API reference](#api-reference)
 14. [Environment variables](#environment-variables)
 15. [Architecture](#architecture)
@@ -112,6 +112,42 @@ Open **<http://localhost:5173>** and use:
 `{"status":"ok","version":"v1"}`.
 
 ❌ Something broken? Jump to [Troubleshooting](#troubleshooting).
+
+---
+
+## Testing
+
+> **You can run these immediately after `composer install` / `npm install`.**
+> The backend suite needs **no database** — see below.
+
+```bash
+# backend
+cd backend
+php artisan test                   # whole Pest suite
+php artisan test --filter=Tenancy  # one area
+vendor/bin/pint --test             # formatting check
+
+# frontend
+cd frontend
+npm run typecheck && npm run lint && npm test && npm run build
+```
+
+**Backend tests use SQLite in-memory by default** (configured in `phpunit.xml`),
+so they need no database and never touch your PostgreSQL.
+
+To run the same suite against PostgreSQL, point it at a **separate** database —
+`RefreshDatabase` drops every table:
+
+```bash
+DB_CONNECTION=pgsql DB_DATABASE=workspace_saas_test php artisan test
+```
+
+**Two guards run inside every test:**
+
+| Guard | Effect |
+| --- | --- |
+| `Model::preventLazyLoading()` | Any relation read without being eager loaded **fails the test**. The feature suite covers every endpoint, which is what keeps N+1 queries out. |
+| OpenAPI document tested against the routes | Checked against the enums and the morph map, so **documentation cannot drift from the code**. |
 
 ---
 
@@ -255,7 +291,7 @@ Workspace ──┬── Members      people, each with a role in this workspac
 | Concept | What it is | The rule to remember |
 | --- | --- | --- |
 | **Workspace** | The tenant boundary. | Everything belongs to exactly one workspace, and **nothing crosses between them**. You can belong to as many as you like. |
-| **Role** | `admin` or `member`. | It is **per workspace** — you can be an admin of one and a member of another. The interface changes accordingly. |
+| **Role** | `admin` or `user` — the UI labels `user` as **"Member"**. | It is **per workspace** — you can be an admin of one and a member of another. The interface changes accordingly. |
 | **Project** | Groups related tasks. | Names are unique within a workspace. Projects are **never deleted, only archived**. |
 | **Task** | The work itself; belongs to one project. | Has a status, priority, optional assignee and optional due date. Deleting hides it everywhere but **keeps its history**. |
 | **Activity** | A permanent record of changes. | Written automatically by the operations that cause it. **Nothing can edit or delete it.** |
@@ -448,39 +484,6 @@ The switcher sits at the **top of the sidebar**.
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | oxlint |
 | `npm run format` | Prettier |
-
----
-
-## Testing
-
-```bash
-# backend
-cd backend
-php artisan test                   # whole Pest suite
-php artisan test --filter=Tenancy  # one area
-vendor/bin/pint --test             # formatting check
-
-# frontend
-cd frontend
-npm run typecheck && npm run lint && npm test && npm run build
-```
-
-**Backend tests use SQLite in-memory by default** (configured in `phpunit.xml`),
-so they need no database and never touch your PostgreSQL.
-
-To run the same suite against PostgreSQL, point it at a **separate** database —
-`RefreshDatabase` drops every table:
-
-```bash
-DB_CONNECTION=pgsql DB_DATABASE=workspace_saas_test php artisan test
-```
-
-**Two guards run inside every test:**
-
-| Guard | Effect |
-| --- | --- |
-| `Model::preventLazyLoading()` | Any relation read without being eager loaded **fails the test**. The feature suite covers every endpoint, which is what keeps N+1 queries out. |
-| OpenAPI document tested against the routes | Checked against the enums and the morph map, so **documentation cannot drift from the code**. |
 
 ---
 
